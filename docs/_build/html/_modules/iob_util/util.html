@@ -1,0 +1,396 @@
+
+<!DOCTYPE html>
+
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>iob_util.util &#8212; iob_util  documentation</title>
+    <link rel="stylesheet" href="../../_static/alabaster.css" type="text/css" />
+    <link rel="stylesheet" href="../../_static/pygments.css" type="text/css" />
+    <script id="documentation_options" data-url_root="../../" src="../../_static/documentation_options.js"></script>
+    <script src="../../_static/jquery.js"></script>
+    <script src="../../_static/underscore.js"></script>
+    <script src="../../_static/doctools.js"></script>
+    <script src="../../_static/language_data.js"></script>
+    <link rel="index" title="Index" href="../../genindex.html" />
+    <link rel="search" title="Search" href="../../search.html" />
+   
+  <link rel="stylesheet" href="../../_static/custom.css" type="text/css" />
+  
+  
+  <meta name="viewport" content="width=device-width, initial-scale=0.9, maximum-scale=0.9" />
+
+  </head><body>
+  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          
+
+          <div class="body" role="main">
+            
+  <h1>Source code for iob_util.util</h1><div class="highlight"><pre>
+<span></span><span class="sd">&quot;&quot;&quot;Util function around iob</span>
+
+<span class="sd">This module contains iob util</span>
+
+<span class="sd">Example:</span>
+<span class="sd">    IOB decoding::</span>
+
+<span class="sd">        convert_iob_to_dict([&#39;私&#39;, &#39;は&#39;, &#39;宇&#39;, &#39;宙&#39;, &#39;人&#39;], [&#39;O&#39;, &#39;O&#39;, &#39;B-C&#39;, &#39;I-C&#39;, &#39;I-C&#39;])</span>
+<span class="sd">        convert_iob_to_xml([&#39;私&#39;, &#39;は&#39;, &#39;宇&#39;, &#39;宙&#39;, &#39;人&#39;], [&#39;O&#39;, &#39;O&#39;, &#39;B-C&#39;, &#39;I-C&#39;, &#39;I-C&#39;])</span>
+
+<span class="sd">    IOB encoding::</span>
+
+<span class="sd">        iobs = convert_xml_to_iob(&#39;私は&lt;C value=&quot;N&quot;&gt;宇宙人&lt;/C&gt;&#39;, tag_lists=[&#39;C&#39;], attr=[&#39;value&#39;], tokenizer=list)</span>
+<span class="sd">        print_iob(iobs)</span>
+<span class="sd">&quot;&quot;&quot;</span>
+
+<span class="kn">import</span> <span class="nn">sys</span>
+<span class="kn">from</span> <span class="nn">xml.etree.ElementTree</span> <span class="kn">import</span> <span class="n">iterparse</span>
+<span class="kn">import</span> <span class="nn">xml.etree.ElementTree</span> <span class="k">as</span> <span class="nn">ET</span>
+
+
+<span class="k">def</span> <span class="nf">split_tag</span><span class="p">(</span><span class="n">tag</span><span class="p">):</span>
+    <span class="k">if</span> <span class="n">tag</span> <span class="o">==</span> <span class="s2">&quot;O&quot;</span><span class="p">:</span>
+        <span class="k">return</span> <span class="n">tag</span><span class="p">,</span> <span class="kc">None</span>
+    <span class="k">else</span><span class="p">:</span>
+        <span class="n">t</span><span class="p">,</span> <span class="n">l</span> <span class="o">=</span> <span class="n">tag</span><span class="o">.</span><span class="n">split</span><span class="p">(</span><span class="s1">&#39;-&#39;</span><span class="p">)</span>
+        <span class="k">return</span> <span class="n">t</span><span class="p">,</span> <span class="n">l</span>
+
+
+<div class="viewcode-block" id="convert_iob_to_dict"><a class="viewcode-back" href="../../util.html#iob_util.util.convert_iob_to_dict">[docs]</a><span class="k">def</span> <span class="nf">convert_iob_to_dict</span><span class="p">(</span><span class="n">tt</span><span class="p">,</span> <span class="n">ii</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;Convert iob to dict</span>
+
+<span class="sd">    Convert tokens and IOB2 labels to dict format</span>
+
+<span class="sd">    Args:</span>
+<span class="sd">        tt (List): token list</span>
+<span class="sd">        ii (List): IOB2 label list</span>
+
+<span class="sd">    Returns:</span>
+<span class="sd">        List: List of dict. Format = [{&#39;span&#39;:(start_idx, end_idx), &#39;type&#39;: tag, &#39;word&#39;: word}]</span>
+
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="k">assert</span> <span class="nb">len</span><span class="p">(</span><span class="n">tt</span><span class="p">)</span> <span class="o">==</span> <span class="nb">len</span><span class="p">(</span><span class="n">ii</span><span class="p">),</span> <span class="s1">&#39;&#39;</span>
+
+    <span class="n">ii</span> <span class="o">=</span> <span class="p">[</span><span class="s1">&#39;O&#39;</span><span class="p">]</span> <span class="o">+</span> <span class="n">ii</span> <span class="o">+</span> <span class="p">[</span><span class="s1">&#39;O&#39;</span><span class="p">]</span>
+    <span class="n">s_pos</span> <span class="o">=</span> <span class="o">-</span><span class="mi">1</span>
+    <span class="n">word</span> <span class="o">=</span> <span class="s1">&#39;&#39;</span>
+    <span class="n">result</span> <span class="o">=</span> <span class="p">[]</span>
+    <span class="k">for</span> <span class="n">idx</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="nb">len</span><span class="p">(</span><span class="n">ii</span><span class="p">)</span><span class="o">-</span><span class="mi">1</span><span class="p">):</span>
+        <span class="n">prefix</span><span class="p">,</span> <span class="n">tag</span> <span class="o">=</span> <span class="n">split_tag</span><span class="p">(</span><span class="n">ii</span><span class="p">[</span><span class="n">idx</span><span class="p">])</span>
+        <span class="k">if</span> <span class="n">is_chunk_start</span><span class="p">(</span><span class="n">ii</span><span class="p">[</span><span class="n">idx</span><span class="o">-</span><span class="mi">1</span><span class="p">],</span> <span class="n">ii</span><span class="p">[</span><span class="n">idx</span><span class="p">]):</span>
+            <span class="n">s_pos</span> <span class="o">=</span> <span class="n">idx</span> <span class="o">-</span> <span class="mi">1</span>
+
+        <span class="k">if</span> <span class="n">s_pos</span> <span class="o">!=</span> <span class="o">-</span><span class="mi">1</span><span class="p">:</span>
+            <span class="n">word</span> <span class="o">+=</span> <span class="n">tt</span><span class="p">[</span><span class="n">idx</span><span class="o">-</span><span class="mi">1</span><span class="p">]</span>
+
+        <span class="k">if</span> <span class="n">is_chunk_end</span><span class="p">(</span><span class="n">ii</span><span class="p">[</span><span class="n">idx</span><span class="p">],</span> <span class="n">ii</span><span class="p">[</span><span class="n">idx</span><span class="o">+</span><span class="mi">1</span><span class="p">]):</span>
+            <span class="n">result</span><span class="o">.</span><span class="n">append</span><span class="p">({</span><span class="s1">&#39;span&#39;</span><span class="p">:(</span><span class="n">s_pos</span><span class="p">,</span> <span class="n">idx</span><span class="p">),</span> <span class="s1">&#39;type&#39;</span><span class="p">:</span><span class="n">tag</span><span class="p">,</span> <span class="s1">&#39;word&#39;</span><span class="p">:</span><span class="n">word</span><span class="p">})</span>
+            <span class="n">s_pos</span> <span class="o">=</span> <span class="o">-</span><span class="mi">1</span>
+            <span class="n">word</span> <span class="o">=</span> <span class="s1">&#39;&#39;</span>
+
+    <span class="k">return</span> <span class="n">result</span></div>
+
+
+<span class="k">def</span> <span class="nf">convert_dict_to_xml</span><span class="p">(</span><span class="n">sent</span><span class="p">,</span> <span class="n">dd</span><span class="p">):</span>
+    <span class="n">result</span> <span class="o">=</span> <span class="s1">&#39;&#39;</span>
+    <span class="n">idx</span> <span class="o">=</span> <span class="mi">0</span>
+    <span class="k">for</span> <span class="n">d</span> <span class="ow">in</span> <span class="n">dd</span><span class="p">:</span>
+        <span class="n">s_pos</span><span class="p">,</span> <span class="n">e_pos</span> <span class="o">=</span> <span class="n">d</span><span class="p">[</span><span class="s1">&#39;span&#39;</span><span class="p">]</span>
+        <span class="k">while</span> <span class="n">idx</span> <span class="o">&lt;</span> <span class="n">s_pos</span><span class="p">:</span>
+            <span class="n">result</span> <span class="o">+=</span> <span class="n">sent</span><span class="p">[</span><span class="n">idx</span><span class="p">]</span>
+            <span class="n">idx</span> <span class="o">+=</span> <span class="mi">1</span>
+
+        <span class="k">if</span> <span class="s1">&#39;norm&#39;</span> <span class="ow">in</span> <span class="n">d</span><span class="p">:</span>
+            <span class="n">result</span> <span class="o">+=</span> <span class="s1">&#39;&lt;&#39;</span> <span class="o">+</span> <span class="n">d</span><span class="p">[</span><span class="s1">&#39;type&#39;</span><span class="p">]</span> <span class="o">+</span> <span class="s1">&#39;&gt;&#39;</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="n">result</span> <span class="o">+=</span> <span class="s1">&#39;&lt;&#39;</span> <span class="o">+</span> <span class="n">d</span><span class="p">[</span><span class="s1">&#39;type&#39;</span><span class="p">]</span> <span class="o">+</span> <span class="s1">&#39;&gt;&#39;</span>
+
+        <span class="n">result</span> <span class="o">+=</span> <span class="n">d</span><span class="p">[</span><span class="s1">&#39;word&#39;</span><span class="p">]</span>
+        <span class="n">result</span> <span class="o">+=</span> <span class="s1">&#39;&lt;/&#39;</span> <span class="o">+</span> <span class="n">d</span><span class="p">[</span><span class="s1">&#39;type&#39;</span><span class="p">]</span> <span class="o">+</span> <span class="s1">&#39;&gt;&#39;</span>
+
+        <span class="n">idx</span> <span class="o">=</span> <span class="n">e_pos</span>
+
+    <span class="k">while</span> <span class="n">idx</span> <span class="o">&lt;</span> <span class="nb">len</span><span class="p">(</span><span class="n">sent</span><span class="p">):</span>
+        <span class="n">result</span> <span class="o">+=</span> <span class="n">sent</span><span class="p">[</span><span class="n">idx</span><span class="p">]</span>
+        <span class="n">idx</span> <span class="o">+=</span> <span class="mi">1</span>
+
+    <span class="k">return</span> <span class="n">result</span>
+
+
+<div class="viewcode-block" id="convert_iob_to_xml"><a class="viewcode-back" href="../../util.html#iob_util.util.convert_iob_to_xml">[docs]</a><span class="k">def</span> <span class="nf">convert_iob_to_xml</span><span class="p">(</span><span class="n">tokens</span><span class="p">,</span> <span class="n">iobs</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;Convert iob to xml</span>
+
+<span class="sd">    Convert tokens and IOB2 labels to xml format.</span>
+
+<span class="sd">    Args:</span>
+<span class="sd">        tt (List): token list</span>
+<span class="sd">        ii (List): IOB2 label list</span>
+
+<span class="sd">    Returns:</span>
+<span class="sd">        str: Xml output.</span>
+
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="n">dic</span> <span class="o">=</span> <span class="n">convert_iob_to_dict</span><span class="p">(</span><span class="n">tokens</span><span class="p">,</span> <span class="n">iobs</span><span class="p">)</span>
+    <span class="k">return</span> <span class="n">convert_dict_to_xml</span><span class="p">(</span><span class="s1">&#39;&#39;</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">tokens</span><span class="p">),</span> <span class="n">dic</span><span class="p">)</span></div>
+
+
+<span class="k">def</span> <span class="nf">convert_xml_to_taglist</span><span class="p">(</span><span class="n">sent</span><span class="p">,</span> <span class="n">tag_list</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">attr</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
+    <span class="n">text</span> <span class="o">=</span> <span class="s1">&#39;&lt;sent&gt;&#39;</span> <span class="o">+</span> <span class="n">sent</span> <span class="o">+</span> <span class="s1">&#39;&lt;/sent&gt;&#39;</span>
+    <span class="n">parser</span> <span class="o">=</span> <span class="n">ET</span><span class="o">.</span><span class="n">XMLPullParser</span><span class="p">([</span><span class="s1">&#39;start&#39;</span><span class="p">,</span> <span class="s1">&#39;end&#39;</span><span class="p">])</span>
+    <span class="n">parser</span><span class="o">.</span><span class="n">feed</span><span class="p">(</span><span class="n">text</span><span class="p">)</span>
+
+    <span class="n">ne_type</span> <span class="o">=</span> <span class="s2">&quot;O&quot;</span>
+    <span class="n">ne_prefix</span> <span class="o">=</span> <span class="s2">&quot;&quot;</span>
+    <span class="n">res</span> <span class="o">=</span> <span class="s2">&quot;&quot;</span>
+    <span class="n">label</span> <span class="o">=</span> <span class="p">[]</span>
+    <span class="n">tag_set</span> <span class="o">=</span> <span class="nb">set</span><span class="p">()</span>
+    <span class="n">s_pos</span> <span class="o">=</span> <span class="o">-</span><span class="mi">1</span>
+    <span class="n">idx</span> <span class="o">=</span> <span class="mi">0</span>
+
+    <span class="k">for</span> <span class="n">event</span><span class="p">,</span> <span class="n">elem</span> <span class="ow">in</span> <span class="n">parser</span><span class="o">.</span><span class="n">read_events</span><span class="p">():</span>
+        <span class="n">isuse</span> <span class="o">=</span> <span class="p">(</span><span class="n">tag_list</span> <span class="ow">is</span> <span class="kc">None</span>
+                <span class="ow">or</span> <span class="p">(</span><span class="n">tag_list</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span> <span class="ow">and</span> <span class="n">elem</span><span class="o">.</span><span class="n">tag</span> <span class="ow">in</span> <span class="n">tag_list</span><span class="p">))</span>
+
+        <span class="k">if</span> <span class="n">event</span> <span class="o">==</span> <span class="s1">&#39;start&#39;</span><span class="p">:</span>
+            <span class="k">assert</span> <span class="nb">len</span><span class="p">(</span><span class="n">tag_set</span><span class="p">)</span> <span class="o">&lt;</span> <span class="mi">2</span><span class="p">,</span> <span class="s2">&quot;タグが入れ子になっています</span><span class="se">\n</span><span class="si">{}</span><span class="s2">&quot;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">sent</span><span class="p">)</span>
+            <span class="n">s_pos</span> <span class="o">=</span> <span class="n">idx</span>
+
+            <span class="k">if</span> <span class="n">elem</span><span class="o">.</span><span class="n">attrib</span><span class="p">:</span>
+                <span class="n">attr_list</span> <span class="o">=</span> <span class="s1">&#39;&#39;</span><span class="o">.</span><span class="n">join</span><span class="p">([</span><span class="n">v</span> <span class="k">for</span> <span class="n">k</span><span class="p">,</span> <span class="n">v</span> <span class="ow">in</span> <span class="n">elem</span><span class="o">.</span><span class="n">attrib</span><span class="o">.</span><span class="n">items</span><span class="p">()</span> <span class="k">if</span> <span class="n">k</span> <span class="ow">in</span> <span class="n">attr</span><span class="p">])</span>
+            <span class="k">else</span><span class="p">:</span>
+                <span class="n">attr_list</span> <span class="o">=</span> <span class="s1">&#39;&#39;</span>
+
+            <span class="n">word</span> <span class="o">=</span> <span class="n">elem</span><span class="o">.</span><span class="n">text</span> <span class="k">if</span> <span class="n">elem</span><span class="o">.</span><span class="n">text</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span> <span class="k">else</span> <span class="s2">&quot;&quot;</span>
+            <span class="n">res</span> <span class="o">+=</span> <span class="n">word</span>
+            <span class="n">idx</span> <span class="o">+=</span> <span class="nb">len</span><span class="p">(</span><span class="n">word</span><span class="p">)</span>
+
+            <span class="k">if</span> <span class="n">elem</span><span class="o">.</span><span class="n">tag</span> <span class="o">!=</span> <span class="s1">&#39;sent&#39;</span> <span class="ow">and</span> <span class="n">isuse</span><span class="p">:</span>
+                <span class="n">tag_set</span><span class="o">.</span><span class="n">add</span><span class="p">(</span><span class="n">elem</span><span class="o">.</span><span class="n">tag</span><span class="p">)</span>
+                <span class="n">label</span><span class="o">.</span><span class="n">append</span><span class="p">((</span><span class="n">s_pos</span><span class="p">,</span> <span class="n">idx</span><span class="o">-</span><span class="mi">1</span><span class="p">,</span> <span class="n">elem</span><span class="o">.</span><span class="n">tag</span> <span class="o">+</span> <span class="n">attr_list</span><span class="p">,</span> <span class="n">word</span><span class="p">))</span>
+
+        <span class="k">if</span> <span class="n">event</span> <span class="o">==</span> <span class="s1">&#39;end&#39;</span><span class="p">:</span>
+            <span class="k">if</span> <span class="n">elem</span><span class="o">.</span><span class="n">tag</span> <span class="o">!=</span> <span class="s1">&#39;sent&#39;</span> <span class="ow">and</span> <span class="n">isuse</span><span class="p">:</span>
+                <span class="n">tag_set</span><span class="o">.</span><span class="n">remove</span><span class="p">(</span><span class="n">elem</span><span class="o">.</span><span class="n">tag</span><span class="p">)</span>
+            <span class="n">word</span> <span class="o">=</span> <span class="n">elem</span><span class="o">.</span><span class="n">tail</span> <span class="k">if</span> <span class="n">elem</span><span class="o">.</span><span class="n">tail</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span> <span class="k">else</span> <span class="s2">&quot;&quot;</span>
+            <span class="n">res</span> <span class="o">+=</span> <span class="n">word</span>
+            <span class="n">idx</span> <span class="o">+=</span> <span class="nb">len</span><span class="p">(</span><span class="n">word</span><span class="p">)</span>
+
+    <span class="k">return</span> <span class="n">res</span><span class="p">,</span> <span class="n">label</span>
+
+
+<span class="k">def</span> <span class="nf">convert_taglist_to_iob</span><span class="p">(</span><span class="n">sent</span><span class="p">,</span> <span class="n">label</span><span class="p">,</span> <span class="n">tokenizer</span><span class="o">=</span><span class="nb">list</span><span class="p">):</span>
+    <span class="n">tokens</span> <span class="o">=</span> <span class="n">tokenizer</span><span class="p">(</span><span class="n">sent</span><span class="p">)</span>
+    <span class="n">results</span> <span class="o">=</span> <span class="p">[]</span>
+
+    <span class="n">idx</span> <span class="o">=</span> <span class="mi">0</span>
+    <span class="n">i</span> <span class="o">=</span> <span class="mi">0</span>
+    <span class="n">j</span> <span class="o">=</span> <span class="mi">0</span>
+
+    <span class="n">nebegin</span> <span class="o">=</span> <span class="kc">True</span>
+
+    <span class="k">while</span> <span class="n">j</span> <span class="o">&lt;</span> <span class="nb">len</span><span class="p">(</span><span class="n">sent</span><span class="p">)</span> <span class="ow">and</span> <span class="n">idx</span> <span class="o">&lt;</span> <span class="nb">len</span><span class="p">(</span><span class="n">label</span><span class="p">):</span>
+        <span class="n">k</span> <span class="o">=</span> <span class="n">j</span> <span class="o">+</span> <span class="nb">len</span><span class="p">(</span><span class="n">tokens</span><span class="p">[</span><span class="n">i</span><span class="p">])</span> <span class="o">-</span> <span class="mi">1</span>
+        <span class="k">if</span> <span class="n">k</span> <span class="o">&lt;</span> <span class="n">label</span><span class="p">[</span><span class="n">idx</span><span class="p">][</span><span class="mi">0</span><span class="p">]:</span>
+            <span class="n">results</span><span class="o">.</span><span class="n">append</span><span class="p">((</span><span class="n">tokens</span><span class="p">[</span><span class="n">i</span><span class="p">],</span> <span class="s1">&#39;O&#39;</span><span class="p">))</span>
+        <span class="k">elif</span> <span class="n">label</span><span class="p">[</span><span class="n">idx</span><span class="p">][</span><span class="mi">0</span><span class="p">]</span> <span class="o">&lt;=</span> <span class="n">k</span> <span class="ow">and</span> <span class="n">nebegin</span><span class="p">:</span>
+            <span class="n">results</span><span class="o">.</span><span class="n">append</span><span class="p">((</span><span class="n">tokens</span><span class="p">[</span><span class="n">i</span><span class="p">],</span> <span class="s1">&#39;B-&#39;</span> <span class="o">+</span> <span class="n">label</span><span class="p">[</span><span class="n">idx</span><span class="p">][</span><span class="mi">2</span><span class="p">]))</span>
+            <span class="n">nebegin</span> <span class="o">=</span> <span class="kc">False</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="n">results</span><span class="o">.</span><span class="n">append</span><span class="p">((</span><span class="n">tokens</span><span class="p">[</span><span class="n">i</span><span class="p">],</span> <span class="s1">&#39;I-&#39;</span> <span class="o">+</span> <span class="n">label</span><span class="p">[</span><span class="n">idx</span><span class="p">][</span><span class="mi">2</span><span class="p">]))</span>
+
+        <span class="n">j</span> <span class="o">+=</span> <span class="nb">len</span><span class="p">(</span><span class="n">tokens</span><span class="p">[</span><span class="n">i</span><span class="p">])</span>
+        <span class="n">i</span> <span class="o">+=</span> <span class="mi">1</span>
+
+        <span class="k">while</span> <span class="n">idx</span> <span class="o">&lt;</span> <span class="nb">len</span><span class="p">(</span><span class="n">label</span><span class="p">)</span> <span class="ow">and</span> <span class="n">label</span><span class="p">[</span><span class="n">idx</span><span class="p">][</span><span class="mi">1</span><span class="p">]</span> <span class="o">&lt;</span> <span class="n">j</span><span class="p">:</span>
+            <span class="n">idx</span> <span class="o">+=</span> <span class="mi">1</span>
+            <span class="n">nebegin</span> <span class="o">=</span> <span class="kc">True</span>
+
+    <span class="k">while</span> <span class="n">i</span> <span class="o">&lt;</span> <span class="nb">len</span><span class="p">(</span><span class="n">tokens</span><span class="p">):</span>
+        <span class="n">results</span><span class="o">.</span><span class="n">append</span><span class="p">((</span><span class="n">tokens</span><span class="p">[</span><span class="n">i</span><span class="p">],</span> <span class="s1">&#39;O&#39;</span><span class="p">))</span>
+        <span class="n">i</span> <span class="o">+=</span> <span class="mi">1</span>
+
+
+    <span class="k">return</span> <span class="n">results</span>
+
+
+<div class="viewcode-block" id="convert_xml_to_iob"><a class="viewcode-back" href="../../util.html#iob_util.util.convert_xml_to_iob">[docs]</a><span class="k">def</span> <span class="nf">convert_xml_to_iob</span><span class="p">(</span><span class="n">sent</span><span class="p">,</span> <span class="n">tag_list</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">attr</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">tokenizer</span><span class="o">=</span><span class="nb">list</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;Convert xml to iob.</span>
+
+<span class="sd">    Convert xml to IOB2 format. You can limit valid tag and attribute.</span>
+
+<span class="sd">    Args:</span>
+<span class="sd">        sent (str): Input xml string.</span>
+<span class="sd">        tag_list (List): List of valid tag.</span>
+<span class="sd">        attr (List): List of valid attribute.</span>
+<span class="sd">        tokenizer (callable): Tokenize function. str-&gt;List</span>
+
+<span class="sd">    Returns:</span>
+<span class="sd">        List (tuple): List of (token, IOB2 tag)</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="n">res</span><span class="p">,</span> <span class="n">label</span> <span class="o">=</span> <span class="n">convert_xml_to_taglist</span><span class="p">(</span><span class="n">sent</span><span class="p">,</span> <span class="n">tag_list</span><span class="o">=</span><span class="n">tag_list</span><span class="p">,</span> <span class="n">attr</span><span class="o">=</span><span class="n">attr</span><span class="p">)</span>
+    <span class="k">return</span> <span class="n">convert_taglist_to_iob</span><span class="p">(</span><span class="n">res</span><span class="p">,</span> <span class="n">label</span><span class="p">,</span> <span class="n">tokenizer</span><span class="o">=</span><span class="n">tokenizer</span><span class="p">)</span></div>
+
+
+<span class="k">def</span> <span class="nf">print_iob</span><span class="p">(</span><span class="n">iob</span><span class="p">):</span>
+    <span class="k">for</span> <span class="n">t</span><span class="p">,</span> <span class="n">l</span> <span class="ow">in</span> <span class="n">iob</span><span class="p">:</span>
+        <span class="nb">print</span><span class="p">(</span><span class="n">t</span> <span class="o">+</span> <span class="s1">&#39;</span><span class="se">\t</span><span class="s1">&#39;</span> <span class="o">+</span> <span class="n">l</span><span class="p">)</span>
+
+
+<span class="k">def</span> <span class="nf">is_chunk_end</span><span class="p">(</span><span class="n">tag</span><span class="p">,</span> <span class="n">post_tag</span><span class="p">):</span>
+    <span class="n">prefix1</span><span class="p">,</span> <span class="n">chunk_type1</span> <span class="o">=</span> <span class="n">split_tag</span><span class="p">(</span><span class="n">tag</span><span class="p">)</span>
+    <span class="n">prefix2</span><span class="p">,</span> <span class="n">chunk_type2</span> <span class="o">=</span> <span class="n">split_tag</span><span class="p">(</span><span class="n">post_tag</span><span class="p">)</span>
+
+    <span class="k">if</span> <span class="n">prefix1</span> <span class="o">==</span> <span class="s1">&#39;O&#39;</span><span class="p">:</span>
+        <span class="k">return</span> <span class="kc">False</span>
+    <span class="k">if</span> <span class="n">prefix2</span> <span class="o">==</span> <span class="s1">&#39;O&#39;</span><span class="p">:</span>
+        <span class="k">return</span> <span class="n">prefix1</span> <span class="o">!=</span> <span class="s1">&#39;O&#39;</span>
+
+    <span class="k">return</span> <span class="n">chunk_type1</span> <span class="o">!=</span> <span class="n">chunk_type2</span>
+
+<span class="k">def</span> <span class="nf">is_chunk_start</span><span class="p">(</span><span class="n">prev_tag</span><span class="p">,</span> <span class="n">tag</span><span class="p">):</span>
+    <span class="n">prefix1</span><span class="p">,</span> <span class="n">chunk_type1</span> <span class="o">=</span> <span class="n">split_tag</span><span class="p">(</span><span class="n">prev_tag</span><span class="p">)</span>
+    <span class="n">prefix2</span><span class="p">,</span> <span class="n">chunk_type2</span> <span class="o">=</span> <span class="n">split_tag</span><span class="p">(</span><span class="n">tag</span><span class="p">)</span>
+
+    <span class="k">if</span> <span class="n">prefix2</span> <span class="o">==</span> <span class="s1">&#39;O&#39;</span><span class="p">:</span>
+        <span class="k">return</span> <span class="kc">False</span>
+    <span class="k">if</span> <span class="n">prefix1</span> <span class="o">==</span> <span class="s1">&#39;O&#39;</span><span class="p">:</span>
+        <span class="k">return</span> <span class="n">prefix2</span> <span class="o">!=</span> <span class="s1">&#39;O&#39;</span>
+
+    <span class="k">return</span> <span class="n">chunk_type1</span> <span class="o">!=</span> <span class="n">chunk_type2</span>
+
+<div class="viewcode-block" id="load_iob"><a class="viewcode-back" href="../../util.html#iob_util.util.load_iob">[docs]</a><span class="k">def</span> <span class="nf">load_iob</span><span class="p">(</span><span class="n">fn</span><span class="p">,</span> <span class="n">z</span><span class="o">=</span><span class="kc">True</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;Load IOB2 file.</span>
+
+<span class="sd">    Load IOB2 file.</span>
+
+<span class="sd">    Args:</span>
+<span class="sd">        fn (str): File path of IOB2 file.</span>
+<span class="sd">        z (bool): Output format. True means this returns [(token, IOB2)] and False means [token_list, IOB2_list]</span>
+
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="k">with</span> <span class="nb">open</span><span class="p">(</span><span class="n">fn</span><span class="p">,</span> <span class="s1">&#39;r&#39;</span><span class="p">)</span> <span class="k">as</span> <span class="n">f</span><span class="p">:</span>
+        <span class="n">iobs</span> <span class="o">=</span> <span class="p">[</span><span class="n">lines</span><span class="o">.</span><span class="n">split</span><span class="p">(</span><span class="s1">&#39;</span><span class="se">\n</span><span class="s1">&#39;</span><span class="p">)</span> <span class="k">for</span> <span class="n">lines</span> <span class="ow">in</span> <span class="n">f</span><span class="o">.</span><span class="n">read</span><span class="p">()</span><span class="o">.</span><span class="n">split</span><span class="p">(</span><span class="s1">&#39;</span><span class="se">\n\n</span><span class="s1">&#39;</span><span class="p">)</span> <span class="k">if</span> <span class="n">lines</span> <span class="o">!=</span> <span class="s1">&#39;&#39;</span><span class="p">]</span>
+        <span class="n">iobs</span> <span class="o">=</span> <span class="p">[[</span><span class="n">i</span><span class="o">.</span><span class="n">split</span><span class="p">(</span><span class="s1">&#39;</span><span class="se">\t</span><span class="s1">&#39;</span><span class="p">)</span> <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="n">ii</span><span class="p">]</span> <span class="k">for</span> <span class="n">ii</span> <span class="ow">in</span> <span class="n">iobs</span><span class="p">]</span>
+
+    <span class="k">if</span> <span class="ow">not</span> <span class="n">z</span><span class="p">:</span>
+        <span class="n">iobs</span> <span class="o">=</span> <span class="p">[</span><span class="nb">list</span><span class="p">(</span><span class="nb">zip</span><span class="p">(</span><span class="o">*</span><span class="n">iob</span><span class="p">))</span> <span class="k">for</span> <span class="n">iob</span> <span class="ow">in</span> <span class="n">iobs</span><span class="p">]</span>
+        <span class="k">return</span> <span class="p">[</span><span class="nb">list</span><span class="p">(</span><span class="n">iob</span><span class="p">[</span><span class="mi">0</span><span class="p">])</span> <span class="k">for</span> <span class="n">iob</span> <span class="ow">in</span> <span class="n">iobs</span><span class="p">],</span> <span class="p">[</span><span class="nb">list</span><span class="p">(</span><span class="n">iob</span><span class="p">[</span><span class="mi">1</span><span class="p">])</span> <span class="k">for</span> <span class="n">iob</span> <span class="ow">in</span> <span class="n">iobs</span><span class="p">]</span>
+
+    <span class="k">return</span> <span class="n">iobs</span></div>
+
+
+<span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">if __name__ == &quot;__main__&quot;:</span>
+<span class="sd">    # data path</span>
+<span class="sd">    data = sys.argv[1]</span>
+
+<span class="sd">    # 属性リスト</span>
+<span class="sd">    attr_list = [&#39;MOD&#39;]</span>
+
+<span class="sd">    # 有効なタグリスト</span>
+<span class="sd">    valid_tag = [&#39;C&#39;]</span>
+<span class="sd">    #valid_tag = None</span>
+
+<span class="sd">    # tokenizer</span>
+<span class="sd">    # 文字単位だと</span>
+<span class="sd">    tokenizer = list</span>
+<span class="sd">    mecab = MeCab.Tagger(&#39;-Owakati&#39;)</span>
+<span class="sd">    tokenizer = Tokenizer(mecab).tokenize</span>
+
+<span class="sd">    # 東大BERT</span>
+<span class="sd">    mecab = MeCab.Tagger(&#39;-Owakati -d /opt/mecab/lib/mecab/dic/mecab-ipadic-neologd -u /opt/mecab/lib/mecab/dic/MANBYO_201907_Dic-utf8.dic&#39;)</span>
+<span class="sd">    tokenizer = Tokenizer(mecab).tokenize</span>
+
+<span class="sd">    </span>
+<span class="sd">    with open(data, &#39;r&#39;) as f:</span>
+<span class="sd">        for i, line in enumerate(f):</span>
+<span class="sd">            line = line.rstrip()</span>
+
+<span class="sd">            if not line:</span>
+<span class="sd">                continue</span>
+
+<span class="sd">            #res, tags = convert_xml_to_taglist(line, valid_tag, attr=attr_list)</span>
+<span class="sd">            #tag_list = convert_taglist_to_iob(res, tags)</span>
+<span class="sd">            tag_list = convert_xml_to_iob(line, valid_tag, attr_list)</span>
+
+<span class="sd">            #print_iob(tag_list)</span>
+<span class="sd">            #print(&quot;&quot;)</span>
+
+<span class="sd">            tokens, iobs = zip(*tag_list)</span>
+
+<span class="sd">            res = convert_iob_to_xml(list(tokens), list(iobs))</span>
+<span class="sd">            print(load_iob(&#39;sample.txt&#39;, z=False))</span>
+<span class="sd">&quot;&quot;&quot;</span>
+</pre></div>
+
+          </div>
+          
+        </div>
+      </div>
+      <div class="sphinxsidebar" role="navigation" aria-label="main navigation">
+        <div class="sphinxsidebarwrapper">
+<h1 class="logo"><a href="../../index.html">iob_util</a></h1>
+
+
+
+
+
+
+
+
+<h3>Navigation</h3>
+<p class="caption"><span class="caption-text">Contents:</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../util.html">Utilities related to IOB2</a></li>
+</ul>
+
+<div class="relations">
+<h3>Related Topics</h3>
+<ul>
+  <li><a href="../../index.html">Documentation overview</a><ul>
+  <li><a href="../index.html">Module code</a><ul>
+  </ul></li>
+  </ul></li>
+</ul>
+</div>
+<div id="searchbox" style="display: none" role="search">
+  <h3 id="searchlabel">Quick search</h3>
+    <div class="searchformwrapper">
+    <form class="search" action="../../search.html" method="get">
+      <input type="text" name="q" aria-labelledby="searchlabel" />
+      <input type="submit" value="Go" />
+    </form>
+    </div>
+</div>
+<script>$('#searchbox').show(0);</script>
+
+
+
+
+
+
+
+
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="footer">
+      &copy;2020, Shogo Ujiie.
+      
+      |
+      Powered by <a href="http://sphinx-doc.org/">Sphinx 3.1.2</a>
+      &amp; <a href="https://github.com/bitprophet/alabaster">Alabaster 0.7.12</a>
+      
+    </div>
+
+    
+
+    
+  </body>
+</html>
