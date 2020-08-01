@@ -26,6 +26,22 @@ def split_tag(tag):
         t, l = tag.split('-')
         return t, l
 
+def unzip_iob(iobs):
+    """Unzip IOB2
+    
+    unzip IOB2
+
+    Args:
+        iobs (List): [(token1, IOB2_1), (token2, IOB2_2), ...]
+
+    Returns:
+        List: [token1, token2, ...]
+        List: [IOB2_1, ...]
+    """
+
+    tokens, labels = zip(*iobs)
+    return list(tokens), list(labels)
+
 
 def convert_iob_to_dict(tt, ii):
     """Convert iob to dict

@@ -4,6 +4,7 @@ from .util import (
         convert_iob_to_xml,
         convert_xml_to_iob,
         print_iob,
-        load_iob
+        load_iob,
+        unzip_iob
         )
 
