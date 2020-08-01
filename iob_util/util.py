@@ -153,7 +153,7 @@ def convert_xml_to_taglist(sent, tag_list=None, attr=[]):
 
             if elem.tag != 'sent' and isuse:
                 tag_set.add(elem.tag)
-                label.append((s_pos, idx-1, elem.tag + attr_list, word))
+                label.append((s_pos, idx, elem.tag + attr_list, word))
 
         if event == 'end':
             if elem.tag != 'sent' and isuse:
