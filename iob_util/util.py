@@ -1,4 +1,4 @@
-"""Util function around iob
+"""Util function around iob (Shogo Ujiie)
 
 This module contains iob util
 
