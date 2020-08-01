@@ -2,3 +2,7 @@
 	path = doc/_build/html
 	url = https://github.com/ujiuji1259/IOB-util.git
 	branch = gh-pages
+[submodule "docs/_build/html"]
+	path = docs/_build/html
+	url = https://github.com/ujiuji1259/IOB-util.git
+	branch = gh-pages
