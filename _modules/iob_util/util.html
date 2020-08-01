@@ -32,7 +32,7 @@
           <div class="body" role="main">
             
   <h1>Source code for iob_util.util</h1><div class="highlight"><pre>
-<span></span><span class="sd">&quot;&quot;&quot;Util function around iob</span>
+<span></span><span class="sd">&quot;&quot;&quot;Util function around iob (Shogo Ujiie ls)</span>
 
 <span class="sd">This module contains iob util</span>
 
@@ -61,7 +61,7 @@
         <span class="k">return</span> <span class="n">t</span><span class="p">,</span> <span class="n">l</span>
 
 
-<div class="viewcode-block" id="convert_iob_to_dict"><a class="viewcode-back" href="../../iob_util.html#iob_util.util.convert_iob_to_dict">[docs]</a><span class="k">def</span> <span class="nf">convert_iob_to_dict</span><span class="p">(</span><span class="n">tt</span><span class="p">,</span> <span class="n">ii</span><span class="p">):</span>
+<div class="viewcode-block" id="convert_iob_to_dict"><a class="viewcode-back" href="../../util.html#iob_util.util.convert_iob_to_dict">[docs]</a><span class="k">def</span> <span class="nf">convert_iob_to_dict</span><span class="p">(</span><span class="n">tt</span><span class="p">,</span> <span class="n">ii</span><span class="p">):</span>
     <span class="sd">&quot;&quot;&quot;Convert iob to dict</span>
 
 <span class="sd">    Convert tokens and IOB2 labels to dict format</span>
@@ -122,7 +122,7 @@
     <span class="k">return</span> <span class="n">result</span>
 
 
-<div class="viewcode-block" id="convert_iob_to_xml"><a class="viewcode-back" href="../../iob_util.html#iob_util.util.convert_iob_to_xml">[docs]</a><span class="k">def</span> <span class="nf">convert_iob_to_xml</span><span class="p">(</span><span class="n">tokens</span><span class="p">,</span> <span class="n">iobs</span><span class="p">):</span>
+<div class="viewcode-block" id="convert_iob_to_xml"><a class="viewcode-back" href="../../util.html#iob_util.util.convert_iob_to_xml">[docs]</a><span class="k">def</span> <span class="nf">convert_iob_to_xml</span><span class="p">(</span><span class="n">tokens</span><span class="p">,</span> <span class="n">iobs</span><span class="p">):</span>
     <span class="sd">&quot;&quot;&quot;Convert iob to xml</span>
 
 <span class="sd">    Convert tokens and IOB2 labels to xml format.</span>
@@ -218,7 +218,7 @@
     <span class="k">return</span> <span class="n">results</span>
 
 
-<div class="viewcode-block" id="convert_xml_to_iob"><a class="viewcode-back" href="../../iob_util.html#iob_util.util.convert_xml_to_iob">[docs]</a><span class="k">def</span> <span class="nf">convert_xml_to_iob</span><span class="p">(</span><span class="n">sent</span><span class="p">,</span> <span class="n">tag_list</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">attr</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">tokenizer</span><span class="o">=</span><span class="nb">list</span><span class="p">):</span>
+<div class="viewcode-block" id="convert_xml_to_iob"><a class="viewcode-back" href="../../util.html#iob_util.util.convert_xml_to_iob">[docs]</a><span class="k">def</span> <span class="nf">convert_xml_to_iob</span><span class="p">(</span><span class="n">sent</span><span class="p">,</span> <span class="n">tag_list</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">attr</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">tokenizer</span><span class="o">=</span><span class="nb">list</span><span class="p">):</span>
     <span class="sd">&quot;&quot;&quot;Convert xml to iob.</span>
 
 <span class="sd">    Convert xml to IOB2 format. You can limit valid tag and attribute.</span>
@@ -263,7 +263,7 @@
 
     <span class="k">return</span> <span class="n">chunk_type1</span> <span class="o">!=</span> <span class="n">chunk_type2</span>
 
-<div class="viewcode-block" id="load_iob"><a class="viewcode-back" href="../../iob_util.html#iob_util.util.load_iob">[docs]</a><span class="k">def</span> <span class="nf">load_iob</span><span class="p">(</span><span class="n">fn</span><span class="p">,</span> <span class="n">z</span><span class="o">=</span><span class="kc">True</span><span class="p">):</span>
+<div class="viewcode-block" id="load_iob"><a class="viewcode-back" href="../../util.html#iob_util.util.load_iob">[docs]</a><span class="k">def</span> <span class="nf">load_iob</span><span class="p">(</span><span class="n">fn</span><span class="p">,</span> <span class="n">z</span><span class="o">=</span><span class="kc">True</span><span class="p">):</span>
     <span class="sd">&quot;&quot;&quot;Load IOB2 file.</span>
 
 <span class="sd">    Load IOB2 file.</span>
@@ -346,7 +346,7 @@
 <h3>Navigation</h3>
 <p class="caption"><span class="caption-text">Contents:</span></p>
 <ul>
-<li class="toctree-l1"><a class="reference internal" href="../../iob_util.html">Utilities function</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../util.html">Utility functions</a></li>
 </ul>
 
 <div class="relations">
