@@ -105,7 +105,7 @@ def convert_iob_to_xml(tokens, iobs):
     return convert_dict_to_xml(''.join(tokens), dic)
 
 
-def convert_xml_to_taglist(sent, tag_list=None, attr=None):
+def convert_xml_to_taglist(sent, tag_list=None, attr=[]):
     text = '<sent>' + sent + '</sent>'
     parser = ET.XMLPullParser(['start', 'end'])
     parser.feed(text)
@@ -126,7 +126,7 @@ def convert_xml_to_taglist(sent, tag_list=None, attr=None):
             assert len(tag_set) < 2, "タグが入れ子になっています\n{}".format(sent)
             s_pos = idx
 
-            if elem.attrib:
+            if attr is not None and elem.attrib:
                 attr_list = ''.join([v for k, v in elem.attrib.items() if k in attr])
             else:
                 attr_list = ''
