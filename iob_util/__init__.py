@@ -5,6 +5,8 @@ from .util import (
         convert_xml_to_iob,
         print_iob,
         load_iob,
-        unzip_iob
+        unzip_iob,
+        is_chunk_start,
+        is_chunk_end,
         )
 
