@@ -9,7 +9,7 @@ IOB2のutil
 ```
 >>> from iob_util import convert_xml_to_iob
 >>> xml = '私は<c value="N">宇宙人</c>です．'
->>> convert_xml_to_iob(xml)
+>>> convert_xml_to_iob(xml, tokenizer=list)
 [('私', 'O'), ('は', 'O'), ('宇', 'B-c'), ('宙', 'I-c'), ('人', 'I-c'), ('で', 'O'), ('す', 'O'), ('．', 'O')]
 
 >>> convert_xml_to_iob(xml, tag_list=['c'], attr=['value'])
