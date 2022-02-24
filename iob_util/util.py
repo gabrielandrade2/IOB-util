@@ -1,3 +1,6 @@
+# Forked from Shogo Ujiie's IOB-Util module
+# Available in https://github.com/ujiuji1259/IOB-util
+
 """Util function around iob (Shogo Ujiie ls)
 
 This module contains iob util
@@ -12,23 +15,28 @@ Example:
 
         iobs = convert_xml_to_iob('私は<C value="N">宇宙人</C>', tag_lists=['C'], attr=['value'], tokenizer=list)
         print_iob(iobs)
+
+Gabriel Andrade modifications:
+    - Allow direct extraction from string containing entities annotated using xml tags (eg. <m-key state="executed">市販の薬</m-key>).
+    - Better support to handle mismatching tags (eg. missing leading or trailing tag).
+    - Allow support for tags using 'i' (e.g. 'm-key')
 """
 
-import sys
-from xml.etree.ElementTree import iterparse
-import xml.etree.ElementTree as ET
 
+import lxml.etree as etree
+from lxml.etree import XMLSyntaxError
 
 def split_tag(tag):
     if tag == "O":
         return tag, None
     else:
-        t, l = tag.split('-')
+        t, l = tag.split('-',1)
         return t, l
+
 
 def unzip_iob(iobs):
     """Unzip IOB2
-    
+
     unzip IOB2
 
     Args:
@@ -62,16 +70,16 @@ def convert_iob_to_dict(tt, ii):
     s_pos = -1
     word = ''
     result = []
-    for idx in range(1, len(ii)-1):
+    for idx in range(1, len(ii) - 1):
         prefix, tag = split_tag(ii[idx])
-        if is_chunk_start(ii[idx-1], ii[idx]):
+        if is_chunk_start(ii[idx - 1], ii[idx]):
             s_pos = idx - 1
 
         if s_pos != -1:
-            word += tt[idx-1]
+            word += tt[idx - 1]
 
-        if is_chunk_end(ii[idx], ii[idx+1]):
-            result.append({'span':(s_pos, idx), 'type':tag, 'word':word})
+        if is_chunk_end(ii[idx], ii[idx + 1]):
+            result.append({'span': (s_pos, idx), 'type': tag, 'word': word})
             s_pos = -1
             word = ''
 
@@ -121,9 +129,13 @@ def convert_iob_to_xml(tokens, iobs):
     return convert_dict_to_xml(''.join(tokens), dic)
 
 
-def convert_xml_to_taglist(sent, tag_list=None, attr=[]):
+def convert_xml_to_taglist(sent, tag_list=None, attr=[], ignore_mismatch_tags=True):
     text = '<sent>' + sent + '</sent>'
-    parser = ET.XMLPullParser(['start', 'end'])
+
+    # Adding recover parameter allows handling missing tags.
+    # It will reject closing tags with not start.
+    # It will consider the start tag to span until the end of the sentence, if not close is found.
+    parser = etree.XMLPullParser(['start', 'end'], recover=not ignore_mismatch_tags)
     parser.feed(text)
 
     ne_type = "O"
@@ -136,7 +148,7 @@ def convert_xml_to_taglist(sent, tag_list=None, attr=[]):
 
     for event, elem in parser.read_events():
         isuse = (tag_list is None
-                or (tag_list is not None and elem.tag in tag_list))
+                 or (tag_list is not None and elem.tag in tag_list))
 
         if event == 'start':
             assert len(tag_set) < 2, "タグが入れ子になっています\n{}".format(sent)
@@ -188,7 +200,7 @@ def convert_taglist_to_iob(sent, label, tokenizer=list):
         j += len(tokens[i])
         i += 1
 
-        while idx < len(label) and label[idx][1] < j:
+        while idx < len(label) and label[idx][1] <= j:
             idx += 1
             nebegin = True
 
@@ -196,11 +208,11 @@ def convert_taglist_to_iob(sent, label, tokenizer=list):
         results.append((tokens[i], 'O'))
         i += 1
 
-
+    results = [i for i in results if not i[0] == ' ' or i[0] == '']
     return results
 
 
-def convert_xml_to_iob(sent, tag_list=None, attr=None, tokenizer=list):
+def convert_xml_to_iob(sent, tag_list=None, attr=None, tokenizer=list, ignore_mismatch_tags=True):
     """Convert xml to iob.
 
     Convert xml to IOB2 format. You can limit valid tag and attribute.
@@ -210,13 +222,50 @@ def convert_xml_to_iob(sent, tag_list=None, attr=None, tokenizer=list):
         tag_list (List): List of valid tag.
         attr (List): List of valid attribute.
         tokenizer (callable): Tokenize function. str->List
+        ignore_mismatch_tags (bool): Should it try to recover if tags are missing?
 
     Returns:
         List (tuple): List of (token, IOB2 tag)
     """
-    res, label = convert_xml_to_taglist(sent, tag_list=tag_list, attr=attr)
-    return convert_taglist_to_iob(res, label, tokenizer=tokenizer)
+    res, label = convert_xml_to_taglist(sent, tag_list=tag_list, attr=attr, ignore_mismatch_tags=ignore_mismatch_tags)
+    iob = convert_taglist_to_iob(res, label, tokenizer=tokenizer)
+    return [item for item in iob if item[0] != '\n']
 
+
+def convert_xml_list_to_iob_list(texts, tag_list, ignore_mismatch_tags=True, print_failed_sentences=False):
+    """Convert a list of texts with xml tags into iob list format.
+
+    :param texts: List of xml texts (List(str))
+    :param tag_list: List of tags to be extracted (List(str))
+    :param ignore_mismatch_tags: Should it try to recover if tags are missing?
+    :param print_failed_sentences: Should it print the failed sentences for debug purposes?
+    :return:
+    """
+    items = list()
+    tags = list()
+    i = 0
+    for t in texts:
+        sent = list()
+        tag = list()
+        try:
+            iob = convert_xml_to_iob(t, tag_list, ignore_mismatch_tags=ignore_mismatch_tags)
+            # Convert tuples into lists
+            for item in iob:
+                if item[0] == ' ':
+                    continue
+                sent.append(item[0])
+                tag.append(item[1])
+            items.append(sent)
+            tags.append(tag)
+        except XMLSyntaxError:
+            if print_failed_sentences:
+                print("Skipping text with xml syntax error, id: " + str(i))
+                print(t)
+        i = i + 1
+    return items, tags
+
+def __list_size(list):
+    return sum([len(t) for t in list])
 
 def print_iob(iob):
     for t, l in iob:
@@ -234,6 +283,7 @@ def is_chunk_end(tag, post_tag):
 
     return chunk_type1 != chunk_type2
 
+
 def is_chunk_start(prev_tag, tag):
     prefix1, chunk_type1 = split_tag(prev_tag)
     prefix2, chunk_type2 = split_tag(tag)
@@ -244,6 +294,7 @@ def is_chunk_start(prev_tag, tag):
         return prefix2 != 'O'
 
     return chunk_type1 != chunk_type2
+
 
 def load_iob(fn, z=True):
     """Load IOB2 file.
@@ -288,7 +339,7 @@ if __name__ == "__main__":
     mecab = MeCab.Tagger('-Owakati -d /opt/mecab/lib/mecab/dic/mecab-ipadic-neologd -u /opt/mecab/lib/mecab/dic/MANBYO_201907_Dic-utf8.dic')
     tokenizer = Tokenizer(mecab).tokenize
 
-    
+
     with open(data, 'r') as f:
         for i, line in enumerate(f):
             line = line.rstrip()
