@@ -21,7 +21,7 @@ Gabriel Andrade modifications:
     - Better support to handle mismatching tags (eg. missing leading or trailing tag).
     - Allow support for tags using 'i' (e.g. 'm-key')
 """
-
+from collections import deque
 
 import lxml.etree as etree
 from lxml.etree import XMLSyntaxError
@@ -30,8 +30,11 @@ def split_tag(tag):
     if tag == "O":
         return tag, None
     else:
-        t, l = tag.split('-',1)
-        return t, l
+        try:
+            t, l = tag.split('-', 1)
+            return t, l
+        except ValueError:
+            return tag, ''
 
 
 def unzip_iob(iobs):
@@ -86,30 +89,76 @@ def convert_iob_to_dict(tt, ii):
     return result
 
 
-def convert_dict_to_xml(sent, dd):
-    result = ''
-    idx = 0
-    for d in dd:
-        s_pos, e_pos = d['span']
-        while idx < s_pos:
-            result += sent[idx]
-            idx += 1
+def convert_iob_taglist_to_dict(ii):
+    """Convert iob tagslist to dict
 
-        if 'norm' in d:
-            result += '<' + d['type'] + '>'
-        else:
-            result += '<' + d['type'] + '>'
+    Convert tokens and IOB2 labels to dict format
 
-        result += d['word']
-        result += '</' + d['type'] + '>'
+    Args:
+        ii (List): IOB2 label list
 
-        idx = e_pos
+    Returns:
+        List: List of dict. Format = [{'span':(start_idx, end_idx), 'type': tag}]
 
-    while idx < len(sent):
-        result += sent[idx]
-        idx += 1
+    """
+    ii = ['O'] + ii + ['O']
+    s_pos = -1
+    result = []
+    for idx in range(1, len(ii) - 1):
+        prefix, tag = split_tag(ii[idx])
+        if is_chunk_start(ii[idx - 1], ii[idx]):
+            s_pos = idx - 1
+
+        if is_chunk_end(ii[idx], ii[idx + 1]):
+            result.append({'span': (s_pos, idx), 'type': tag})
+            s_pos = -1
 
     return result
+
+
+def convert_dict_to_xml(sent, dd):
+    # Generate all text tags
+    dd = sorted(dd, key=lambda x: x['span'][0])
+    tags = []
+    for d in dd:
+        tags.append((d['span'][0], "<" + d['type'] + ">"))  # Start tag
+        tags.append((d['span'][1], "</" + d['type'] + ">"))  # End tag
+    tags = sorted(tags, key=lambda x: x[0])
+
+    # Tag texts
+    offset = 0
+    for tag in tags:
+        sent = sent[:tag[0] + offset] + tag[1] + sent[tag[0] + offset:]
+        offset += len(tag[1])
+    return sent
+
+
+def convert_taglist_to_xml(sent, dd):
+    # Generate all text tags
+    dd = sorted(dd, key=lambda x: x[0])
+    tags = []
+    for d in dd:
+        tags.append((d[0], "<" + d[2] + ">"))  # Start tag
+        tags.append((d[1], "</" + d[2] + ">"))  # End tag
+    tags = sorted(tags, key=lambda x: x[0])
+
+    # Tag texts
+    offset = 0
+    for tag in tags:
+        sent = sent[:tag[0] + offset] + tag[1] + sent[tag[0] + offset:]
+        offset += len(tag[1])
+    return sent
+
+
+def convert_taglist_to_dict(taglist):
+    dict_tags = []
+    for tag in taglist:
+        dict_tags.append({
+            'span': [tag[0], tag[1]],
+            'type': tag[2],
+            'word': tag[3]
+        })
+    return dict_tags
 
 
 def convert_iob_to_xml(tokens, iobs):
@@ -118,8 +167,8 @@ def convert_iob_to_xml(tokens, iobs):
     Convert tokens and IOB2 labels to xml format.
 
     Args:
-        tt (List): token list
-        ii (List): IOB2 label list
+        tokens (List): token list
+        iobs (List): IOB2 label list
 
     Returns:
         str: Xml output.
@@ -129,7 +178,14 @@ def convert_iob_to_xml(tokens, iobs):
     return convert_dict_to_xml(''.join(tokens), dic)
 
 
-def convert_xml_to_taglist(sent, tag_list=None, attr=[], ignore_mismatch_tags=True):
+def convert_list_iob_to_xml(list_tokens, list_iobs):
+    texts = list()
+    for tokens, iobs in zip(list_tokens, list_iobs):
+        texts.append(convert_iob_to_xml(tokens, iobs))
+    return '\n'.join(texts)
+
+
+def convert_xml_to_taglist(sent, tag_list=None, attr=[], ignore_mismatch_tags=True, tokenizer=list):
     text = '<sent>' + sent + '</sent>'
 
     # Adding recover parameter allows handling missing tags.
@@ -142,16 +198,16 @@ def convert_xml_to_taglist(sent, tag_list=None, attr=[], ignore_mismatch_tags=Tr
     ne_prefix = ""
     res = ""
     label = []
-    tag_set = set()
+    tag_set = deque()
     s_pos = -1
     idx = 0
+    word = ''
 
     for event, elem in parser.read_events():
-        isuse = (tag_list is None
-                 or (tag_list is not None and elem.tag in tag_list))
+        isuse = (tag_list is None or (tag_list is not None and elem.tag in tag_list))
 
         if event == 'start':
-            assert len(tag_set) < 2, "タグが入れ子になっています\n{}".format(sent)
+            # assert len(tag_set) < 2, "タグが入れ子になっています\n{}".format(sent)
             s_pos = idx
 
             if attr is not None and elem.attrib:
@@ -161,20 +217,39 @@ def convert_xml_to_taglist(sent, tag_list=None, attr=[], ignore_mismatch_tags=Tr
 
             word = elem.text if elem.text is not None else ""
             res += word
-            idx += len(word)
+            idx += len(tokenizer(word))
 
             if elem.tag != 'sent' and isuse:
-                tag_set.add(elem.tag)
-                label.append((s_pos, idx, elem.tag + attr_list, word))
+                label_list = [s_pos, idx, elem.tag + attr_list, word, elem.tag]
+                tag_set.append(label_list)
+                # label.append((s_pos, idx, elem.tag + attr_list, word))
 
         if event == 'end':
-            if elem.tag != 'sent' and isuse:
-                tag_set.remove(elem.tag)
+            if elem.tag != 'sent' and isuse and tag_set[-1][-1] == elem.tag:
+                # and tag_set[-1] == elem.tag:
+                label_list = tag_set.pop()
+                label.append(tuple(label_list[:-1]))
+                for tag in tag_set:
+                    tag[1] = idx
+                    tag[3] += word
             word = elem.tail if elem.tail is not None else ""
             res += word
-            idx += len(word)
+            idx += len(tokenizer(word))
 
     return res, label
+
+
+def convert_xml_to_dict(sent, tag_list=None, attr=[], ignore_mismatch_tags=True):
+    res, label = convert_xml_to_taglist(sent, tag_list=tag_list, attr=attr, ignore_mismatch_tags=ignore_mismatch_tags)
+    label_dict = []
+    for tag in label:
+        label_dict.append({
+            "span": (int(tag[0]), int(tag[1])),
+            "word": tag[3],
+            "type": tag[2]
+        })
+
+    return res, label_dict
 
 
 def convert_taglist_to_iob(sent, label, tokenizer=list):
@@ -212,7 +287,7 @@ def convert_taglist_to_iob(sent, label, tokenizer=list):
     return results
 
 
-def convert_xml_to_iob(sent, tag_list=None, attr=None, tokenizer=list, ignore_mismatch_tags=True):
+def convert_xml_text_to_iob(sent, tag_list=None, attr=None, tokenizer=list, ignore_mismatch_tags=True):
     """Convert xml to iob.
 
     Convert xml to IOB2 format. You can limit valid tag and attribute.
@@ -227,28 +302,32 @@ def convert_xml_to_iob(sent, tag_list=None, attr=None, tokenizer=list, ignore_mi
     Returns:
         List (tuple): List of (token, IOB2 tag)
     """
-    res, label = convert_xml_to_taglist(sent, tag_list=tag_list, attr=attr, ignore_mismatch_tags=ignore_mismatch_tags)
+    res, label = convert_xml_to_taglist(sent, tag_list=tag_list, attr=attr, ignore_mismatch_tags=ignore_mismatch_tags, tokenizer=tokenizer)
     iob = convert_taglist_to_iob(res, label, tokenizer=tokenizer)
     return [item for item in iob if item[0] != '\n']
 
 
-def convert_xml_list_to_iob_list(texts, tag_list, ignore_mismatch_tags=True, print_failed_sentences=False):
+def convert_xml_text_list_to_iob_list(texts, tag_list=None, attr=None, ignore_mismatch_tags=True,
+                                      print_failed_sentences=False):
     """Convert a list of texts with xml tags into iob list format.
 
     :param texts: List of xml texts (List(str))
     :param tag_list: List of tags to be extracted (List(str))
+    :param attr: List of tag attributes to be extracted (List(str))
     :param ignore_mismatch_tags: Should it try to recover if tags are missing?
     :param print_failed_sentences: Should it print the failed sentences for debug purposes?
     :return:
     """
+    print("Converting xml to iob...")
     items = list()
     tags = list()
+    dropped = list()
     i = 0
     for t in texts:
         sent = list()
         tag = list()
         try:
-            iob = convert_xml_to_iob(t, tag_list, ignore_mismatch_tags=ignore_mismatch_tags)
+            iob = convert_xml_text_to_iob(t, tag_list, attr, ignore_mismatch_tags=ignore_mismatch_tags)
             # Convert tuples into lists
             for item in iob:
                 if item[0] == ' ':
@@ -257,15 +336,17 @@ def convert_xml_list_to_iob_list(texts, tag_list, ignore_mismatch_tags=True, pri
                 tag.append(item[1])
             items.append(sent)
             tags.append(tag)
-        except XMLSyntaxError:
+        except XMLSyntaxError as e:
             if print_failed_sentences:
+                dropped.append(i)
                 print("Skipping text with xml syntax error, id: " + str(i))
                 print(t)
+            elif not ignore_mismatch_tags:
+                raise e
         i = i + 1
+    if print_failed_sentences:
+        return items, tags, dropped
     return items, tags
-
-def __list_size(list):
-    return sum([len(t) for t in list])
 
 def print_iob(iob):
     for t, l in iob:
@@ -278,7 +359,9 @@ def is_chunk_end(tag, post_tag):
 
     if prefix1 == 'O':
         return False
-    if prefix2 == 'O':
+    elif prefix2 == 'B':
+        return True
+    elif prefix2 == 'O':
         return prefix1 != 'O'
 
     return chunk_type1 != chunk_type2
@@ -288,10 +371,12 @@ def is_chunk_start(prev_tag, tag):
     prefix1, chunk_type1 = split_tag(prev_tag)
     prefix2, chunk_type2 = split_tag(tag)
 
+    if prefix2 == 'B':
+        return True
     if prefix2 == 'O':
         return False
-    if prefix1 == 'O':
-        return prefix2 != 'O'
+    if prefix1 == 'O' and prefix2 == 'I':
+        return True
 
     return chunk_type1 != chunk_type2
 
@@ -316,46 +401,11 @@ def load_iob(fn, z=True):
 
     return iobs
 
-
-"""
-if __name__ == "__main__":
-    # data path
-    data = sys.argv[1]
-
-    # 属性リスト
-    attr_list = ['MOD']
-
-    # 有効なタグリスト
-    valid_tag = ['C']
-    #valid_tag = None
-
-    # tokenizer
-    # 文字単位だと
-    tokenizer = list
-    mecab = MeCab.Tagger('-Owakati')
-    tokenizer = Tokenizer(mecab).tokenize
-
-    # 東大BERT
-    mecab = MeCab.Tagger('-Owakati -d /opt/mecab/lib/mecab/dic/mecab-ipadic-neologd -u /opt/mecab/lib/mecab/dic/MANBYO_201907_Dic-utf8.dic')
-    tokenizer = Tokenizer(mecab).tokenize
-
-
-    with open(data, 'r') as f:
-        for i, line in enumerate(f):
-            line = line.rstrip()
-
-            if not line:
-                continue
-
-            #res, tags = convert_xml_to_taglist(line, valid_tag, attr=attr_list)
-            #tag_list = convert_taglist_to_iob(res, tags)
-            tag_list = convert_xml_to_iob(line, valid_tag, attr_list)
-
-            #print_iob(tag_list)
-            #print("")
-
-            tokens, iobs = zip(*tag_list)
-
-            res = convert_iob_to_xml(list(tokens), list(iobs))
-            print(load_iob('sample.txt', z=False))
-"""
+# Test code
+if __name__ == '__main__':
+    text = 'This is a <c><core>test</core></c> <a>string <core>containing</core> multiple</a> tags <d>stacked</d>.'
+    untagged_text, tags = convert_xml_to_taglist(text)
+    print(tags)
+    convert_taglist_to_xml(untagged_text, tags)
+    untagged_text, tags = convert_xml_to_taglist(text)
+    print(tags)
