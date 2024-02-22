@@ -1,10 +1,12 @@
 # IOB-util
-IOB2のutil
+Utility for converting IOB2 to and from xml and dict formats.
 
-## インストール
-`pip install git+https://github.com/ujiuji1259/IOB-util.git`
+Forked from https://github.com/ujiuji1259/IOB-util.
 
-## 使い方
+## Installation
+`pip install git+https://github.com/gabrielandrade2/IOB-util.git`
+
+## Usage
 ### xml -> IOB2
 ```
 >>> from iob_util import convert_xml_to_iob
@@ -62,5 +64,5 @@ sample.iob
 (['私', 'は', '宇', '宙', '人', 'で', 'す'], ['O', 'O', 'C', 'O', 'O', 'O', 'O'])
 ```
 
-## ドキュメント
-[こちら](https://ujiuji1259.github.io/IOB-util/)
+## Further documentation
+Please refer to the code documentation or the original documentation from Ujiie [here](https://ujiuji1259.github.io/IOB-util/)
