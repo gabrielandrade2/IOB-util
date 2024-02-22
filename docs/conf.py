@@ -18,8 +18,8 @@ sys.path.insert(0, os.path.abspath('../'))
 # -- Project information -----------------------------------------------------
 
 project = 'iob_util'
-copyright = '2020, Shogo Ujiie'
-author = 'Shogo Ujiie'
+copyright = '2024, Gabriel Andrade; 2020, Shogo Ujiie'
+author = 'Gabriel Herman Bernardim Andrade, Shogo Ujiie'
 
 
 # -- General configuration ---------------------------------------------------

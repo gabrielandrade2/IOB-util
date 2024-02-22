@@ -1,0 +1,23 @@
+[tool.poetry]
+name = "iob_util"
+version = "0.2.0"
+description = "Utility for converting IOB2 to and from xml and dict formats."
+authors = [
+    "Gabriel Herman Bernardim Andrade <gabrielhbandrade@gmail.com>",
+    "Shogo Ujiie"
+]
+readme = "README.md"
+repository = "https://github.com/gabrielandrade2/IOB-util"
+
+[tool.poetry.dependencies]
+python = "^3.6"
+lxml = "^5.1.0"
+
+[tool.poetry.dev-dependencies]
+pytest = "^5.2"
+
+[build-system]
+requires = [
+    "poetry>=0.12",
+]
+build-backend = "poetry.masonry.api"

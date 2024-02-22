@@ -17,8 +17,8 @@ Example:
         print_iob(iobs)
 
 Gabriel Andrade modifications:
-    - Allow direct extraction from string containing entities annotated using xml tags (eg. <m-key state="executed">市販の薬</m-key>).
-    - Better support to handle mismatching tags (eg. missing leading or trailing tag).
+    - Allow direct extraction from string containing entities annotated using xml tags (e.g. <m-key state="executed">市販の薬</m-key>).
+    - Better support to handle mismatching tags (e.g. missing leading or trailing tag).
     - Allow support for tags using 'i' (e.g. 'm-key')
 """
 from collections import deque
